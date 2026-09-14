@@ -9,7 +9,18 @@
 
 describe('Login spec', () => {
   beforeEach(() => {
+    // Intercept preload profile request agar tidak terjadi delay/re-render di tengah test
+    cy.intercept('GET', '**/v1/users/me', {
+      statusCode: 401,
+      body: {
+        status: 'fail',
+        message: 'Missing authentication',
+      },
+    }).as('preloadProfile');
+
     cy.visit('/login');
+    cy.get('#email-input').should('be.visible');
+    cy.get('#password-input').should('be.visible');
   });
 
   it('should display login page correctly', () => {
@@ -45,7 +56,7 @@ describe('Login spec', () => {
   });
 
   it('should display homepage when email and password are correct', () => {
-    // intercept API login dan profile untuk simulasi sukses
+    // intercept API login dan profile setelah login berhasil
     cy.intercept('POST', '**/v1/login', {
       statusCode: 200,
       body: {
@@ -77,7 +88,15 @@ describe('Login spec', () => {
       statusCode: 200,
       body: {
         status: 'success',
-        data: { users: [] },
+        data: {
+          users: [
+            {
+              id: 'user-1',
+              name: 'John Doe',
+              email: 'john@example.com',
+            },
+          ],
+        },
       },
     });
 
@@ -85,7 +104,31 @@ describe('Login spec', () => {
       statusCode: 200,
       body: {
         status: 'success',
-        data: { threads: [] },
+        data: {
+          threads: [
+            {
+              id: 'thread-1',
+              title: 'Thread Pertama',
+              body: 'Konten thread pertama',
+              category: 'react',
+              createdAt: '2023-05-29T07:55:52.266Z',
+              ownerId: 'user-1',
+              upVotesBy: [],
+              downVotesBy: [],
+              totalComments: 0,
+            },
+          ],
+        },
+      },
+    });
+
+    cy.intercept('GET', '**/v1/leaderboards', {
+      statusCode: 200,
+      body: {
+        status: 'success',
+        data: {
+          leaderboards: [],
+        },
       },
     });
 
