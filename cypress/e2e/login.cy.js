@@ -21,6 +21,15 @@ describe('Login spec', () => {
   });
 
   it('should display alert when email and password are wrong', () => {
+    // intercept API login untuk simulasi gagal
+    cy.intercept('POST', '**/v1/login', {
+      statusCode: 400,
+      body: {
+        status: 'fail',
+        message: 'email or password is wrong',
+      },
+    }).as('loginFail');
+
     // mengisi email dan password yang salah
     cy.get('#email-input').type('wrong_user@example.com');
     cy.get('#password-input').type('wrongpassword');
@@ -28,22 +37,69 @@ describe('Login spec', () => {
     // menekan tombol submit
     cy.get('button[type="submit"]').click();
 
-    // memverifikasi window alert muncul dengan pesan error dari API
+    // memverifikasi request dipanggil dan window alert muncul
+    cy.wait('@loginFail');
     cy.on('window:alert', (str) => {
-      expect(str).to.be.a('string');
-      expect(str.length).to.be.greaterThan(0);
+      expect(str).to.equal('email or password is wrong');
     });
   });
 
   it('should display homepage when email and password are correct', () => {
+    // intercept API login dan profile untuk simulasi sukses
+    cy.intercept('POST', '**/v1/login', {
+      statusCode: 200,
+      body: {
+        status: 'success',
+        message: 'ok',
+        data: {
+          token: 'fake-jwt-token-12345',
+        },
+      },
+    }).as('loginSuccess');
+
+    cy.intercept('GET', '**/v1/users/me', {
+      statusCode: 200,
+      body: {
+        status: 'success',
+        message: 'ok',
+        data: {
+          user: {
+            id: 'user-1',
+            name: 'John Doe',
+            email: 'john@example.com',
+            avatar: 'https://ui-avatars.com/api/?name=John+Doe',
+          },
+        },
+      },
+    }).as('getOwnProfile');
+
+    cy.intercept('GET', '**/v1/users', {
+      statusCode: 200,
+      body: {
+        status: 'success',
+        data: { users: [] },
+      },
+    });
+
+    cy.intercept('GET', '**/v1/threads', {
+      statusCode: 200,
+      body: {
+        status: 'success',
+        data: { threads: [] },
+      },
+    });
+
     // mengisi email dan password dengan akun yang valid
-    cy.get('#email-input').type('tester123@gmail.com');
+    cy.get('#email-input').type('john@example.com');
     cy.get('#password-input').type('password123');
 
     // menekan tombol submit
     cy.get('button[type="submit"]').click();
 
-    // memverifikasi diarahkan ke homepage atau elemen aplikasi tersedia
+    // memverifikasi request selesai dan diarahkan ke homepage
+    cy.wait('@loginSuccess');
+    cy.wait('@getOwnProfile');
     cy.url().should('not.include', '/login');
+    cy.get('header').should('be.visible');
   });
 });
